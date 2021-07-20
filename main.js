@@ -463,6 +463,8 @@
         } catch (e) {
             console.debug("Couldn't load save state");
         }
+
+        story.ResetState();
         return false;
     }
 
