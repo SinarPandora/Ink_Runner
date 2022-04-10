@@ -5,7 +5,6 @@
 
     let savePoint = '';
 
-    let savedTheme;
     let globalTagTheme;
     let additionThemes = ['dark'];
     let nextTag = 'p';
@@ -30,26 +29,26 @@
             let splitTag = splitPropertyTag(globalTag);
 
             // title: name
-            if (splitTag && splitTag.property == 'title') {
+            if (splitTag && splitTag.property === 'title') {
                 document.title = splitTag.val;
                 let title = document.querySelector('h1#title');
                 title.innerHTML = splitTag.val;
             }
 
             // THEME: dark
-            if (splitTag && splitTag.property == 'theme') {
+            if (splitTag && splitTag.property === 'theme') {
                 globalTagTheme = splitTag.val;
             }
 
             // author: Your Name
-            else if (splitTag && splitTag.property == 'author') {
+            else if (splitTag && splitTag.property === 'author') {
                 let byline = document.querySelector('.byline');
                 byline.innerHTML = '作者：' + splitTag.val;
                 document.title = splitTag.val;
             }
 
             // addition_themes: themes(split with comma)
-            else if (splitTag && splitTag.property == 'addition_themes') {
+            else if (splitTag && splitTag.property === 'addition_themes') {
                 additionThemes = splitTag.val.split(',');
             }
         }
@@ -67,13 +66,11 @@
     savePoint = story.state.toJson();
 
     // Kick off the start of the story!
-    continueStory(true);
+    continueStory(true).then();
 
     // Main story processing function. Each time this is called it generates
     // all the next content up as far as the next set of choices.
-    function continueStory(firstTime) {
-
-        let paragraphIndex = 0;
+    async function continueStory(firstTime) {
         let delay = 0.0;
 
         // Don't over-scroll past new content
@@ -81,8 +78,10 @@
 
         // Generate story text - loop through available content
         while (story.canContinue) {
+            const postTasks = [];
 
             // Get ink to generate the next paragraph
+            // Variable will be inject here
             let paragraphText = story.Continue();
             let tags = story.currentTags;
             console.debug(`${paragraphText} -> ${tags}`)
@@ -97,7 +96,7 @@
                 let splitTag = splitPropertyTag(tag);
 
                 // AUDIO: src,delay
-                if (splitTag && splitTag.property == 'AUDIO') {
+                if (splitTag && splitTag.property === 'AUDIO') {
                     let [src, delay, vol] = splitTag.val.split(',');
                     setTimeout(() => {
                         if ('audio' in this) {
@@ -115,7 +114,7 @@
                 }
 
                 // AUDIOLOOP: src,delay
-                else if (splitTag && splitTag.property == 'AUDIOLOOP') {
+                else if (splitTag && splitTag.property === 'AUDIOLOOP') {
                     let [src, delay, vol] = splitTag.val.split(',');
                     setTimeout(() => {
                         if ('audioLoop' in this) {
@@ -134,12 +133,12 @@
                 }
 
                 // AUDIOLOOP_PAUSE
-                else if (tag == 'AUDIOLOOP_PAUSE') {
+                else if (tag === 'AUDIOLOOP_PAUSE') {
                     this.audioLoop.pause();
                 }
 
                 // AUDIOLOOP_RESUME
-                else if (tag == 'AUDIOLOOP_RESUME') {
+                else if (tag === 'AUDIOLOOP_RESUME') {
                     if (this.audioLoop.paused) {
                         this.audioLoop.play();
                     } else {
@@ -148,99 +147,112 @@
                 }
 
                 // IMAGE: src
-                if (splitTag && splitTag.property == 'IMAGE') {
+                if (splitTag && splitTag.property === 'IMAGE') {
                     let imageElement = document.createElement('img');
                     imageElement.src = splitTag.val;
                     storyContainer.appendChild(imageElement);
 
-                    showAfter(delay, imageElement);
+                    await showAfter(delay, imageElement);
                     delay += 200.0;
                 }
 
                 // LINK: url
-                else if (splitTag && splitTag.property == 'LINK') {
+                else if (splitTag && splitTag.property === 'LINK') {
                     window.location.href = splitTag.val;
                 }
 
                 // LINKOPEN: url
-                else if (splitTag && splitTag.property == 'LINKOPEN') {
+                else if (splitTag && splitTag.property === 'LINKOPEN') {
                     window.open(splitTag.val);
                 }
 
                 // SETTHEME: name
-                else if (splitTag && splitTag.property == 'SETTHEME') {
+                else if (splitTag && splitTag.property === 'SETTHEME') {
                     document.body.classList.remove(...additionThemes);
-                    if (splitTag.val != 'default') {
+                    if (splitTag.val !== 'default') {
                         document.body.classList.add(splitTag.val);
                     }
                 }
 
                 // BACKGROUND: src
-                else if (splitTag && splitTag.property == 'BACKGROUND') {
+                else if (splitTag && splitTag.property === 'BACKGROUND') {
                     outerScrollContainer.style.backgroundImage = 'url(' + splitTag.val + ')';
                 }
 
                 // UNSET_BACKGROUND
-                else if (tag == 'UNSET_BACKGROUND') {
+                else if (tag === 'UNSET_BACKGROUND') {
                     outerScrollContainer.style.backgroundImage = undefined;
                 }
 
                 // CLASS: class1,class2
-                else if (splitTag && splitTag.property == 'CLASS') {
+                else if (splitTag && splitTag.property === 'CLASS') {
                     customClasses.push(...splitTag.val.split(','));
                 }
 
-                // ANIMATE: prop1, prop2
-                else if (splitTag && splitTag.property == 'ANIMATE') {
+                // ANIMATE: prop1,prop2
+                else if (splitTag && splitTag.property === 'ANIMATE') {
                     customClasses.push('animate__animated', ...splitTag.val.split(',').map(prop => `animate__${prop}`));
                 }
 
+                // ASK: [variable, question, default answer] in array form
+                else if (splitTag && splitTag.property === 'ASK') {
+                    postTasks.push(async () => {
+                        return new Promise(resolve => setTimeout(() => {
+                            const [variable, question, defaultAnswer] = eval(splitTag.val);
+                            const result = prompt(question, defaultAnswer);
+                            story.variablesState[variable] = result == null ? defaultAnswer : result;
+                            savePoint = story.state.toJson();
+                            resolve();
+                        }));
+                    })
+                }
+
                 // HEADER: show/hidden
-                else if (splitTag && splitTag.property == 'HEADER') {
-                    if (splitTag.val.toLowerCase == 'show') {
+                else if (splitTag && splitTag.property === 'HEADER') {
+                    if (splitTag.val.toLowerCase() === 'show') {
                         setVisible('.header', true);
-                    } else if (splitTag.val.toLowerCase == 'hidden') {
+                    } else if (splitTag.val.toLowerCase() === 'hidden') {
                         setVisible('.header', false);
                     }
                 }
 
                 // INLINE
-                else if (tag == 'INLINE') {
+                else if (tag === 'INLINE') {
                     inline.isInline = true;
                     inline.into = true;
                 }
 
                 // UNINLINE
-                else if (tag == 'UNINLINE') {
+                else if (tag === 'UNINLINE') {
                     inline.exit = true;
                 }
 
                 // HTML_TAG: name
-                else if (splitTag && splitTag.property == 'HTML_TAG') {
+                else if (splitTag && splitTag.property === 'HTML_TAG') {
                     nextTag = splitTag.val;
                     undoTagChange = true;
                 }
 
                 // SETTITLE: name
-                else if (splitTag && splitTag.property == 'SETTITLE') {
+                else if (splitTag && splitTag.property === 'SETTITLE') {
                     document.title = splitTag.val;
                     document.querySelector('h1#title').innerHTML = splitTag.val;
                 }
 
                 // SETAUTHOR: name
-                else if (splitTag && splitTag.property == 'SETAUTHOR') {
+                else if (splitTag && splitTag.property === 'SETAUTHOR') {
                     let byline = document.querySelector('.byline');
                     byline.innerHTML = '作者：' + splitTag.val;
                     document.title = splitTag.val;
                 }
 
                 // DELAY: number(ms)
-                else if (splitTag && splitTag.property == 'DELAY') {
+                else if (splitTag && splitTag.property === 'DELAY') {
                     delay += +splitTag.val - 200;
                 }
 
                 // CLEAR_KEEP_HEADER - clears but keep header visible
-                else if (tag == 'CLEAR_KEEP_HEADER') {
+                else if (tag === 'CLEAR_KEEP_HEADER') {
                     removeAll('p');
                     removeAll('span');
                     removeAll('img');
@@ -248,7 +260,7 @@
 
                 // CLEAR - removes all existing content.
                 // RESTART - clears everything and restarts the story from the beginning
-                else if (tag == 'CLEAR' || tag == 'RESTART') {
+                else if (tag === 'CLEAR' || tag === 'RESTART') {
                     removeAll('p');
                     removeAll('span');
                     removeAll('img');
@@ -256,7 +268,7 @@
                     // Comment out this line if you want to leave the header visible when clearing
                     setVisible('.header', false);
 
-                    if (tag == 'RESTART') {
+                    if (tag === 'RESTART') {
                         restart();
                         return;
                     }
@@ -271,7 +283,7 @@
                     nextTag = 'span';
                 }
 
-                if (paragraphText.trim() != 'TAG_ONLY') {
+                if (paragraphText.trim() !== 'TAG_ONLY') {
                     let inlineElement = document.createElement(nextTag);
                     if (undoTagChange) {
                         nextTag = 'span';
@@ -287,13 +299,13 @@
                 if (inline.exit) {
                     storyContainer.appendChild(inline.paragraphGroup);
                     // Fade in paragraph after a short delay
-                    showAfter(delay, inline.paragraphGroup);
+                    await showAfter(delay, inline.paragraphGroup);
                     delay += 200.0;
                     inline.exit = false;
                     inline.isInline = false;
                     nextTag = 'p';
                 }
-            } else if (paragraphText.trim() != 'TAG_ONLY') {
+            } else if (paragraphText.trim() !== 'TAG_ONLY') {
                 let paragraphElement = document.createElement(nextTag);
                 if (undoTagChange) {
                     nextTag = 'p';
@@ -307,13 +319,17 @@
                     paragraphElement.classList.add(customClasses[i]);
 
                 // Fade in paragraph after a short delay
-                showAfter(delay, paragraphElement);
+                await showAfter(delay, paragraphElement);
                 delay += 200.0;
             }
-        }
+
+            for (let task of postTasks) {
+                await task();
+            }
+        } // End story loop
 
         // Create HTML choices from ink choices
-        story.currentChoices.forEach(function (choice) {
+        for (const choice of story.currentChoices) {
 
             // Create paragraph with anchor element
             let choiceParagraphElement = document.createElement('p');
@@ -322,7 +338,7 @@
             storyContainer.appendChild(choiceParagraphElement);
 
             // Fade choice in after a short delay
-            showAfter(delay, choiceParagraphElement);
+            await showAfter(delay, choiceParagraphElement);
             delay += 200.0;
 
             // Click on choice
@@ -342,18 +358,18 @@
                 savePoint = story.state.toJson();
 
                 // Aaand loop
-                continueStory();
+                continueStory(false).then();
             });
-        });
+        }
 
         // Extend height to fit
         // We do this manually so that removing elements and creating new ones doesn't
         // cause the height (and therefore scroll) to jump backwards temporarily.
         storyContainer.style.height = contentBottomEdgeY() + 'px';
 
-        if (!firstTime)
-            scrollDown(previousBottomEdge);
-
+        if (!firstTime) {
+            scrollDown(previousBottomEdge)
+        }
     }
 
     function restart() {
@@ -364,7 +380,7 @@
         // set save point to here
         savePoint = story.state.toJson();
 
-        continueStory(true);
+        continueStory(true).then();
 
         outerScrollContainer.scrollTo(0, 0);
     }
@@ -374,9 +390,14 @@
     // -----------------------------------
 
     // Fades in an element after a specified delay
-    function showAfter(delay, el) {
-        el.classList.add('hide');
-        setTimeout(function () { el.classList.remove('hide') }, delay);
+    async function showAfter(delay, el) {
+        return new Promise(resolve => {
+            el.classList.add('hide');
+            setTimeout(function () {
+                el.classList.remove('hide');
+                resolve();
+            }, delay);
+        });
     }
 
     // Scrolls the page down, but no further than the bottom edge of what you could
@@ -483,8 +504,8 @@
         let browserDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
         if (savedTheme === 'dark'
-            || (savedTheme == undefined && globalTagTheme === 'dark')
-            || (savedTheme == undefined && globalTagTheme == undefined && browserDark))
+            || (savedTheme == null && globalTagTheme === 'dark')
+            || (savedTheme == null && globalTagTheme == null && browserDark))
             document.body.classList.add('dark');
     }
 
@@ -492,7 +513,7 @@
     function setupButtons(hasSave) {
 
         let rewindEl = document.getElementById('rewind');
-        if (rewindEl) rewindEl.addEventListener('click', function (event) {
+        if (rewindEl) rewindEl.addEventListener('click', function (_event) {
             removeAll('p');
             removeAll('img');
             setVisible('.header', false);
@@ -500,7 +521,7 @@
         });
 
         let saveEl = document.getElementById('save');
-        if (saveEl) saveEl.addEventListener('click', function (event) {
+        if (saveEl) saveEl.addEventListener('click', function (_event) {
             try {
                 window.localStorage.setItem('save-state', savePoint);
                 document.getElementById('reload').removeAttribute('disabled');
@@ -515,7 +536,7 @@
         if (!hasSave) {
             reloadEl.setAttribute('disabled', 'disabled');
         }
-        reloadEl.addEventListener('click', function (event) {
+        reloadEl.addEventListener('click', function (_event) {
             if (reloadEl.getAttribute('disabled'))
                 return;
 
@@ -527,11 +548,11 @@
             } catch (e) {
                 console.debug("Couldn't load save state");
             }
-            continueStory(true);
+            continueStory(true).then();
         });
 
         let themeSwitchEl = document.getElementById('theme-switch');
-        if (themeSwitchEl) themeSwitchEl.addEventListener('click', function (event) {
+        if (themeSwitchEl) themeSwitchEl.addEventListener('click', function (_event) {
             document.body.classList.add('switched');
             document.body.classList.toggle('dark');
         });
