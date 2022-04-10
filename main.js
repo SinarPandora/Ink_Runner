@@ -196,15 +196,20 @@
 
                 // ASK: [variable, question, default answer] in array form
                 else if (splitTag && splitTag.property === 'ASK') {
-                    postTasks.push(async () => {
-                        return new Promise(resolve => setTimeout(() => {
-                            const [variable, question, defaultAnswer] = eval(splitTag.val);
-                            const result = prompt(question, defaultAnswer);
-                            story.variablesState[variable] = result == null ? defaultAnswer : result;
-                            savePoint = story.state.toJson();
-                            resolve();
-                        }));
-                    })
+                    const args = eval(splitTag.val);
+                    if (args.length < 2) {
+                        alert("脚本错误，ASK 标签没有被正确配置")
+                    } else {
+                        postTasks.push(async () => {
+                            return new Promise(resolve => setTimeout(() => {
+                                const [variable, question, defaultAnswer] = args;
+                                const result = prompt(question, defaultAnswer);
+                                story.variablesState[variable] = result == null ? defaultAnswer : result;
+                                savePoint = story.state.toJson();
+                                resolve();
+                            }));
+                        });
+                    }
                 }
 
                 // HEADER: show/hidden
