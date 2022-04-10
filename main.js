@@ -15,13 +15,14 @@
         exit: false,
         paragraphGroup: null
     };
+    let textAnimate = [];
 
     // TOAST Plugin config
     const TOAST_COLOR = {
         'default': '#353535',
         'success': 'linear-gradient(to right, #4CAF50, #43A047)',
-        'warning': 'linear-gradient(to right, #FF8F00, #FF6F00)',
-        'error': 'linear-gradient(to right, #D32F2F, #C62828)',
+        'highlight': 'linear-gradient(to right, #FF8F00, #FF6F00)',
+        'danger': 'linear-gradient(to right, #D32F2F, #C62828)',
     }
 
     // Global tags - those at the top of the ink file
@@ -30,6 +31,7 @@
     //  # theme: dark
     //  # author: Your Name
     //  # addition_themes: dark
+    //  # text_animate: class list
     let globalTags = story.globalTags;
     if (globalTags) {
         for (let i = 0; i < story.globalTags.length; i++) {
@@ -58,6 +60,11 @@
             // addition_themes: themes(split with comma)
             else if (splitTag.property === 'addition_themes') {
                 additionThemes = splitTag.val.split(',');
+            }
+
+            // text_animate: css
+            if (splitTag && splitTag.property === 'text_animate') {
+                textAnimate = splitTag.val.split(',').map(it => it.trim());
             }
         }
     }
@@ -276,7 +283,7 @@
                     else if (splitTag.property === 'TOASTER') {
                         postTasks.push(async () => {
                             return new Promise(resolve => setTimeout(() => {
-                                Toastify(JSON.parse(splitTag.val.trim())).showToast()
+                                Toastify(eval(splitTag.val)).showToast()
                                 resolve();
                             }));
                         });
@@ -320,7 +327,7 @@
                         removeAll('img');
                     }
 
-                        // CLEAR - removes all existing content.
+                    // CLEAR - removes all existing content.
                     // RESTART - clears everything and restarts the story from the beginning
                     else if (tag === 'CLEAR' || tag === 'RESTART') {
                         removeAll('p');
@@ -455,9 +462,14 @@
     // Fades in an element after a specified delay
     async function showAfter(delay, el) {
         return new Promise(resolve => {
-            el.classList.add('hide');
+            el.classList.add(textAnimate.length > 0? 'invisible': 'hide');
             setTimeout(function () {
-                el.classList.remove('hide');
+                if (textAnimate.length > 0) {
+                    el.classList.remove('invisible');
+                    el.classList.add(...textAnimate);
+                } else {
+                    el.classList.remove('hide');
+                }
                 resolve();
             }, delay);
         });
@@ -526,8 +538,8 @@
     function splitPropertyTag(tag) {
         let propertySplitIdx = tag.indexOf(':');
         if (propertySplitIdx != null) {
-            let property = tag.substr(0, propertySplitIdx).trim();
-            let val = tag.substr(propertySplitIdx + 1).trim();
+            let property = tag.substring(0, propertySplitIdx).trim();
+            let val = tag.substring(propertySplitIdx + 1).trim();
             return {
                 property: property,
                 val: val
