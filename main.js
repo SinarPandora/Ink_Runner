@@ -204,8 +204,24 @@
                             return new Promise(resolve => setTimeout(() => {
                                 const [variable, question, defaultAnswer] = args;
                                 const result = prompt(question, defaultAnswer);
-                                story.variablesState[variable] = result == null ? defaultAnswer : result;
+                                story.variablesState[variable] = result == null ? (defaultAnswer ?? '') : result;
                                 savePoint = story.state.toJson();
+                                resolve();
+                            }));
+                        });
+                    }
+                }
+
+                // WINDOW: [title, config] in array form
+                else if (splitTag && splitTag.property === 'WINDOW') {
+                    const args = eval(splitTag.val);
+                    if (args.length < 2) {
+                        alert("脚本错误，WINDOW 标签没有被正确配置")
+                    } else {
+                        postTasks.push(async () => {
+                            return new Promise(resolve => setTimeout(() => {
+                                const [title, config] = args;
+                                new WinBox(title, config);
                                 resolve();
                             }));
                         });
