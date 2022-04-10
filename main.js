@@ -16,6 +16,14 @@
         paragraphGroup: null
     };
 
+    // TOAST Plugin config
+    const TOAST_COLOR = {
+        'default': '#353535',
+        'success': 'linear-gradient(to right, #4CAF50, #43A047)',
+        'warning': 'linear-gradient(to right, #FF8F00, #FF6F00)',
+        'error': 'linear-gradient(to right, #D32F2F, #C62828)',
+    }
+
     // Global tags - those at the top of the ink file
     // We support:
     //  # title: name
@@ -41,14 +49,14 @@
             }
 
             // author: Your Name
-            else if (splitTag && splitTag.property === 'author') {
+            else if (splitTag.property === 'author') {
                 let byline = document.querySelector('.byline');
                 byline.innerHTML = '作者：' + splitTag.val;
                 document.title = splitTag.val;
             }
 
             // addition_themes: themes(split with comma)
-            else if (splitTag && splitTag.property === 'addition_themes') {
+            else if (splitTag.property === 'addition_themes') {
                 additionThemes = splitTag.val.split(',');
             }
         }
@@ -95,203 +103,237 @@
                 // customised to be used for other things too.
                 let splitTag = splitPropertyTag(tag);
 
-                // AUDIO: src,delay
-                if (splitTag && splitTag.property === 'AUDIO') {
-                    let [src, delay, vol] = splitTag.val.split(',');
-                    setTimeout(() => {
-                        if ('audio' in this) {
-                            this.audio.pause();
-                            this.audio.removeAttribute('src');
-                            this.audio.load();
-                        }
-                        this.audio = new Audio(src);
-                        this.audio.preload = 'auto';
-                        if (vol != null) {
-                            this.audio.volume = +vol;
-                        }
-                        this.audio.play();
-                    }, delay == null ? 0 : +delay);
-                }
-
-                // AUDIOLOOP: src,delay
-                else if (splitTag && splitTag.property === 'AUDIOLOOP') {
-                    let [src, delay, vol] = splitTag.val.split(',');
-                    setTimeout(() => {
-                        if ('audioLoop' in this) {
-                            this.audioLoop.pause();
-                            this.audioLoop.removeAttribute('src');
-                            this.audioLoop.load();
-                        }
-                        this.audioLoop = new Audio(src);
-                        this.audioLoop.preload = 'auto';
-                        if (vol != null) {
-                            this.audioLoop.volume = +vol;
-                        }
-                        this.audioLoop.play();
-                        this.audioLoop.loop = true;
-                    }, delay == null ? 0 : +delay);
-                }
-
-                // AUDIOLOOP_PAUSE
-                else if (tag === 'AUDIOLOOP_PAUSE') {
-                    this.audioLoop.pause();
-                }
-
-                // AUDIOLOOP_RESUME
-                else if (tag === 'AUDIOLOOP_RESUME') {
-                    if (this.audioLoop.paused) {
-                        this.audioLoop.play();
-                    } else {
-                        console.warn('Audio loop already playing.')
+                if (splitTag) {
+                    // AUDIO: src,delay
+                    if (splitTag.property === 'AUDIO') {
+                        let [src, delay, vol] = splitTag.val.split(',');
+                        setTimeout(() => {
+                            if ('audio' in this) {
+                                this.audio.pause();
+                                this.audio.removeAttribute('src');
+                                this.audio.load();
+                            }
+                            this.audio = new Audio(src);
+                            this.audio.preload = 'auto';
+                            if (vol != null) {
+                                this.audio.volume = +vol;
+                            }
+                            this.audio.play();
+                        }, delay == null ? 0 : +delay);
                     }
-                }
 
-                // IMAGE: src
-                if (splitTag && splitTag.property === 'IMAGE') {
-                    let imageElement = document.createElement('img');
-                    imageElement.src = splitTag.val;
-                    storyContainer.appendChild(imageElement);
-
-                    await showAfter(delay, imageElement);
-                    delay += 200.0;
-                }
-
-                // LINK: url
-                else if (splitTag && splitTag.property === 'LINK') {
-                    window.location.href = splitTag.val;
-                }
-
-                // LINKOPEN: url
-                else if (splitTag && splitTag.property === 'LINKOPEN') {
-                    window.open(splitTag.val);
-                }
-
-                // SETTHEME: name
-                else if (splitTag && splitTag.property === 'SETTHEME') {
-                    document.body.classList.remove(...additionThemes);
-                    if (splitTag.val !== 'default') {
-                        document.body.classList.add(splitTag.val);
+                    // AUDIOLOOP: src,delay
+                    else if (splitTag.property === 'AUDIOLOOP') {
+                        let [src, delay, vol] = splitTag.val.split(',');
+                        setTimeout(() => {
+                            if ('audioLoop' in this) {
+                                this.audioLoop.pause();
+                                this.audioLoop.removeAttribute('src');
+                                this.audioLoop.load();
+                            }
+                            this.audioLoop = new Audio(src);
+                            this.audioLoop.preload = 'auto';
+                            if (vol != null) {
+                                this.audioLoop.volume = +vol;
+                            }
+                            this.audioLoop.play();
+                            this.audioLoop.loop = true;
+                        }, delay == null ? 0 : +delay);
                     }
-                }
 
-                // BACKGROUND: src
-                else if (splitTag && splitTag.property === 'BACKGROUND') {
-                    outerScrollContainer.style.backgroundImage = 'url(' + splitTag.val + ')';
-                }
+                    // IMAGE: src
+                    else if (splitTag.property === 'IMAGE') {
+                        let imageElement = document.createElement('img');
+                        imageElement.src = splitTag.val;
+                        storyContainer.appendChild(imageElement);
 
-                // UNSET_BACKGROUND
-                else if (tag === 'UNSET_BACKGROUND') {
-                    outerScrollContainer.style.backgroundImage = undefined;
-                }
+                        await showAfter(delay, imageElement);
+                        delay += 200.0;
+                    }
 
-                // CLASS: class1,class2
-                else if (splitTag && splitTag.property === 'CLASS') {
-                    customClasses.push(...splitTag.val.split(','));
-                }
+                    // LINK: url
+                    else if (splitTag.property === 'LINK') {
+                        window.location.href = splitTag.val;
+                    }
 
-                // ANIMATE: prop1,prop2
-                else if (splitTag && splitTag.property === 'ANIMATE') {
-                    customClasses.push('animate__animated', ...splitTag.val.split(',').map(prop => `animate__${prop}`));
-                }
+                    // LINKOPEN: url
+                    else if (splitTag.property === 'LINKOPEN') {
+                        window.open(splitTag.val);
+                    }
 
-                // ASK: [variable, question, default answer] in array form
-                else if (splitTag && splitTag.property === 'ASK') {
-                    const args = eval(splitTag.val);
-                    if (args.length < 2) {
-                        alert("脚本错误，ASK 标签没有被正确配置")
-                    } else {
+                    // SETTHEME: name
+                    else if (splitTag.property === 'SETTHEME') {
+                        document.body.classList.remove(...additionThemes);
+                        if (splitTag.val !== 'default') {
+                            document.body.classList.add(splitTag.val);
+                        }
+                    }
+
+                    // BACKGROUND: src
+                    else if (splitTag.property === 'BACKGROUND') {
+                        outerScrollContainer.style.backgroundImage = 'url(' + splitTag.val + ')';
+                    }
+
+                    // CLASS: class1,class2
+                    else if (splitTag.property === 'CLASS') {
+                        customClasses.push(...splitTag.val.split(','));
+                    }
+
+                    // ANIMATE: prop1,prop2
+                    else if (splitTag.property === 'ANIMATE') {
+                        customClasses.push('animate__animated', ...splitTag.val.split(',').map(prop => `animate__${prop}`));
+                    }
+
+                    // ASK: [variable, question, default answer] in array form
+                    else if (splitTag.property === 'ASK') {
+                        const args = eval(splitTag.val);
+                        if (args.length < 2) {
+                            alert("脚本错误，ASK 标签没有被正确配置")
+                        } else {
+                            postTasks.push(async () => {
+                                return new Promise(resolve => setTimeout(() => {
+                                    const [variable, question, defaultAnswer] = args;
+                                    const result = prompt(question, defaultAnswer);
+                                    story.variablesState[variable] = result == null ? (defaultAnswer ?? '') : result;
+                                    savePoint = story.state.toJson();
+                                    resolve();
+                                }));
+                            });
+                        }
+                    }
+
+                    // WINDOW: [title, config] in array form
+                    else if (splitTag.property === 'WINDOW') {
+                        const args = eval(splitTag.val);
+                        if (args.length < 2) {
+                            alert("脚本错误，WINDOW 标签没有被正确配置")
+                        } else {
+                            postTasks.push(async () => {
+                                return new Promise(resolve => setTimeout(() => {
+                                    const [title, config] = args;
+                                    new WinBox(title, config);
+                                    resolve();
+                                }));
+                            });
+                        }
+                    }
+
+                    // HEADER: show/hidden
+                    else if (splitTag.property === 'HEADER') {
+                        if (splitTag.val.toLowerCase() === 'show') {
+                            setVisible('.header', true);
+                        } else if (splitTag.val.toLowerCase() === 'hidden') {
+                            setVisible('.header', false);
+                        }
+                    }
+
+                    // HTML_TAG: name
+                    else if (splitTag.property === 'HTML_TAG') {
+                        nextTag = splitTag.val;
+                        undoTagChange = true;
+                    }
+
+                    // SETTITLE: name
+                    else if (splitTag.property === 'SETTITLE') {
+                        document.title = splitTag.val;
+                        document.querySelector('h1#title').innerHTML = splitTag.val;
+                    }
+
+                    // SETAUTHOR: name
+                    else if (splitTag.property === 'SETAUTHOR') {
+                        let byline = document.querySelector('.byline');
+                        byline.innerHTML = '作者：' + splitTag.val;
+                        document.title = splitTag.val;
+                    }
+
+                    // DELAY: number(ms)
+                    else if (splitTag.property === 'DELAY') {
+                        delay += +splitTag.val - 200;
+                    }
+
+                    // TOAST: [text, color, timeout, avatar] in array form
+                    else if (splitTag.property === 'TOAST') {
+                        const args = eval(splitTag.val);
+                        if (args.length < 1) {
+                            alert("脚本错误，TOAST 标签没有被正确配置")
+                        } else {
+                            postTasks.push(async () => await toast(args));
+                        }
+                    }
+
+                    // MESSAGE: [avatar, text, color, timeout] in array form
+                    else if (splitTag.property === 'MESSAGE') {
+                        const args = eval(splitTag.val);
+                        if (args.length < 2) {
+                            alert("脚本错误，MESSAGE 标签没有被正确配置")
+                        } else {
+                            let [avatar, text, color, timeout] = args;
+                            postTasks.push(async () => await toast([text, color ?? null, timeout ?? null, avatar]));
+                        }
+                    }
+
+                    // TOASTER: config
+                    else if (splitTag.property === 'TOASTER') {
                         postTasks.push(async () => {
                             return new Promise(resolve => setTimeout(() => {
-                                const [variable, question, defaultAnswer] = args;
-                                const result = prompt(question, defaultAnswer);
-                                story.variablesState[variable] = result == null ? (defaultAnswer ?? '') : result;
-                                savePoint = story.state.toJson();
+                                Toastify(JSON.parse(splitTag.val.trim())).showToast()
                                 resolve();
                             }));
                         });
                     }
-                }
 
-                // WINDOW: [title, config] in array form
-                else if (splitTag && splitTag.property === 'WINDOW') {
-                    const args = eval(splitTag.val);
-                    if (args.length < 2) {
-                        alert("脚本错误，WINDOW 标签没有被正确配置")
-                    } else {
-                        postTasks.push(async () => {
-                            return new Promise(resolve => setTimeout(() => {
-                                const [title, config] = args;
-                                new WinBox(title, config);
-                                resolve();
-                            }));
-                        });
+                } else {
+                    // AUDIOLOOP_PAUSE
+                    if (tag === 'AUDIOLOOP_PAUSE') {
+                        this.audioLoop.pause();
                     }
-                }
 
-                // HEADER: show/hidden
-                else if (splitTag && splitTag.property === 'HEADER') {
-                    if (splitTag.val.toLowerCase() === 'show') {
-                        setVisible('.header', true);
-                    } else if (splitTag.val.toLowerCase() === 'hidden') {
+                    // AUDIOLOOP_RESUME
+                    else if (tag === 'AUDIOLOOP_RESUME') {
+                        if (this.audioLoop.paused) {
+                            this.audioLoop.play();
+                        } else {
+                            console.warn('Audio loop already playing.')
+                        }
+                    }
+
+                    // UNSET_BACKGROUND
+                    else if (tag === 'UNSET_BACKGROUND') {
+                        outerScrollContainer.style.backgroundImage = undefined;
+                    }
+
+                    // INLINE
+                    else if (tag === 'INLINE') {
+                        inline.isInline = true;
+                        inline.into = true;
+                    }
+
+                    // UNINLINE
+                    else if (tag === 'UNINLINE') {
+                        inline.exit = true;
+                    }
+
+                    // CLEAR_KEEP_HEADER - clears but keep header visible
+                    else if (tag === 'CLEAR_KEEP_HEADER') {
+                        removeAll('p');
+                        removeAll('span');
+                        removeAll('img');
+                    }
+
+                        // CLEAR - removes all existing content.
+                    // RESTART - clears everything and restarts the story from the beginning
+                    else if (tag === 'CLEAR' || tag === 'RESTART') {
+                        removeAll('p');
+                        removeAll('span');
+                        removeAll('img');
+
+                        // Comment out this line if you want to leave the header visible when clearing
                         setVisible('.header', false);
-                    }
-                }
 
-                // INLINE
-                else if (tag === 'INLINE') {
-                    inline.isInline = true;
-                    inline.into = true;
-                }
-
-                // UNINLINE
-                else if (tag === 'UNINLINE') {
-                    inline.exit = true;
-                }
-
-                // HTML_TAG: name
-                else if (splitTag && splitTag.property === 'HTML_TAG') {
-                    nextTag = splitTag.val;
-                    undoTagChange = true;
-                }
-
-                // SETTITLE: name
-                else if (splitTag && splitTag.property === 'SETTITLE') {
-                    document.title = splitTag.val;
-                    document.querySelector('h1#title').innerHTML = splitTag.val;
-                }
-
-                // SETAUTHOR: name
-                else if (splitTag && splitTag.property === 'SETAUTHOR') {
-                    let byline = document.querySelector('.byline');
-                    byline.innerHTML = '作者：' + splitTag.val;
-                    document.title = splitTag.val;
-                }
-
-                // DELAY: number(ms)
-                else if (splitTag && splitTag.property === 'DELAY') {
-                    delay += +splitTag.val - 200;
-                }
-
-                // CLEAR_KEEP_HEADER - clears but keep header visible
-                else if (tag === 'CLEAR_KEEP_HEADER') {
-                    removeAll('p');
-                    removeAll('span');
-                    removeAll('img');
-                }
-
-                // CLEAR - removes all existing content.
-                // RESTART - clears everything and restarts the story from the beginning
-                else if (tag === 'CLEAR' || tag === 'RESTART') {
-                    removeAll('p');
-                    removeAll('span');
-                    removeAll('img');
-
-                    // Comment out this line if you want to leave the header visible when clearing
-                    setVisible('.header', false);
-
-                    if (tag === 'RESTART') {
-                        restart();
-                        return;
+                        if (tag === 'RESTART') {
+                            restart();
+                            return;
+                        }
                     }
                 }
             }
@@ -437,6 +479,7 @@
         let dist = target - start;
         let duration = 300 + 300 * dist / 100;
         let startTime = null;
+
         function step(time) {
             if (startTime == null) startTime = time;
             let t = (time - startTime) / duration;
@@ -444,6 +487,7 @@
             outerScrollContainer.scrollTo(0, (1.0 - lerp) * start + lerp * target);
             if (t < 1) requestAnimationFrame(step);
         }
+
         requestAnimationFrame(step);
     }
 
@@ -577,6 +621,30 @@
             document.body.classList.add('switched');
             document.body.classList.toggle('dark');
         });
+    }
+
+    // Show a toast
+    async function toast(args) {
+        return new Promise(resolve => setTimeout(() => {
+            let [text, color, timeout, avatar] = args;
+            color = TOAST_COLOR[color] ?? TOAST_COLOR.default;
+            timeout = timeout ?? 4000;
+            Toastify({
+                text: text,
+                style: {
+                    background: color,
+                    minWidth: '300px',
+                    display: 'flex',
+                    alignItems: 'center'
+                },
+                avatar: avatar,
+                gravity: 'bottom',
+                position: 'center',
+                duration: timeout,
+                stopOnFocus: true,
+            }).showToast()
+            resolve();
+        }));
     }
 
 })(storyContent);
