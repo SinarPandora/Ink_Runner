@@ -289,6 +289,19 @@
                         });
                     }
 
+                    // READER_INPUT: [prompt, variable, defaultValue, pattern, type]
+                    else if (splitTag.property === 'READER_INPUT') {
+                        const args = eval(splitTag.val);
+                        if (args.length < 2) {
+                            alert("脚本错误，READER_INPUT 标签没有被正确配置")
+                        } else {
+                            postTasks.push(async () => {
+                                const [prompt, variable, defaultValue, pattern, type] = args;
+                                await requireReaderInput(prompt, variable, defaultValue, pattern, type);
+                            });
+                        }
+                    }
+
                 } else {
                     // AUDIOLOOP_PAUSE
                     if (tag === 'AUDIOLOOP_PAUSE') {
@@ -322,17 +335,13 @@
 
                     // CLEAR_KEEP_HEADER - clears but keep header visible
                     else if (tag === 'CLEAR_KEEP_HEADER') {
-                        removeAll('p');
-                        removeAll('span');
-                        removeAll('img');
+                        resetStoryContainer();
                     }
 
-                    // CLEAR - removes all existing content.
+                        // CLEAR - removes all existing content.
                     // RESTART - clears everything and restarts the story from the beginning
                     else if (tag === 'CLEAR' || tag === 'RESTART') {
-                        removeAll('p');
-                        removeAll('span');
-                        removeAll('img');
+                        resetStoryContainer();
 
                         // Comment out this line if you want to leave the header visible when clearing
                         setVisible('.header', false);
@@ -462,7 +471,7 @@
     // Fades in an element after a specified delay
     async function showAfter(delay, el) {
         return new Promise(resolve => {
-            el.classList.add(textAnimate.length > 0? 'invisible': 'hide');
+            el.classList.add(textAnimate.length > 0 ? 'invisible' : 'hide');
             setTimeout(function () {
                 if (textAnimate.length > 0) {
                     el.classList.remove('invisible');
@@ -591,8 +600,7 @@
 
         let rewindEl = document.getElementById('rewind');
         if (rewindEl) rewindEl.addEventListener('click', function (_event) {
-            removeAll('p');
-            removeAll('img');
+            resetStoryContainer();
             setVisible('.header', false);
             restart();
         });
@@ -617,8 +625,7 @@
             if (reloadEl.getAttribute('disabled'))
                 return;
 
-            removeAll('p');
-            removeAll('img');
+            resetStoryContainer();
             try {
                 let savedState = window.localStorage.getItem('save-state');
                 if (savedState) story.state.LoadJson(savedState);
@@ -635,7 +642,11 @@
         });
     }
 
-    // Show a toast
+    /**
+     * Show toast
+     *
+     * @param args Toast args
+     */
     async function toast(args) {
         return new Promise(resolve => setTimeout(() => {
             let [text, color, timeout, avatar] = args;
@@ -657,6 +668,123 @@
             }).showToast()
             resolve();
         }));
+    }
+
+    /**
+     * Require reader input
+     * <div>
+     *     <p> Prompt </p>
+     *     <input /><button> Submit </button>
+     *     <span> Hit </span>
+     * </div>
+     *
+     * @param promptText    Prompt information
+     * @param variable      Variable to set the value
+     * @param defaultValue  Default value
+     * @param pattern       Value pattern, for number is range or regex, for text is regex
+     * @param type          Input type, string or number
+     */
+    async function requireReaderInput(promptText, variable, defaultValue, pattern, type) {
+        defaultValue = defaultValue ?? '';
+        // Create validator
+        let validator = null;
+        if (pattern != null) {
+            if (pattern instanceof RegExp) {
+                validator = (a) => pattern.test(a);
+            } else if (type === 'number') {
+                // If pattern is "number ~ number"
+                if (/-?[0-9]+\s*~\s*-?[0-9]+/.test(pattern.trim())) {
+                    const [from, to] = pattern.split('~').map(it => it.trim());
+                    validator = (a) => a >= from && a <= to;
+                } else {
+                    try {
+                        const regex = new RegExp(pattern);
+                        validator = (a) => regex.test(a);
+                    } catch (e) {
+                        alert("脚本错误，READER_INPUT 标签没有被正确配置，正则表达式配置不正确，输入验证将不会生效");
+                        console.error(e);
+                    }
+                }
+            } else if (type === 'text') {
+                try {
+                    const regex = new RegExp(pattern);
+                    validator = (a) => regex.test(a);
+                } catch (e) {
+                    alert("脚本错误，READER_INPUT 标签没有被正确配置，正则表达式配置不正确，输入验证将不会生效");
+                    console.error(e);
+                }
+            } else {
+                alert(`脚本错误，READER_INPUT 标签没有被正确配置，不支持的类型：${type}`)
+            }
+        }
+        // Container
+        const container = document.createElement('div');
+        container.classList.add('reader-input');
+        container.id = 'reader-input';
+        // Prompt
+        const prompt = document.createElement('p');
+        prompt.textContent = promptText;
+        // Input
+        const input = document.createElement('input');
+        input.placeholder = defaultValue !== '' ? `默认值：${defaultValue}` : '';
+        input.value = defaultValue;
+        input.type = type ?? 'text';
+        // Submit
+        const submit = document.createElement('button');
+        submit.textContent = '确认';
+        // Hit
+        const hit = document.createElement('span');
+        hit.classList.add('hide');
+        hit.textContent = '输入格式不正确';
+        // Input function
+        if (validator != null) {
+            input.oninput = () => {
+                const value = input.value.trim();
+                if ((value === '' && defaultValue !== '') || validator(value)) {
+                    if (!hit.classList.contains('hide')) {
+                        hit.classList.add('hide');
+                    }
+                    submit.disabled = false;
+                    submit.textContent = '确认';
+                } else {
+                    if (hit.classList.contains('hide')) {
+                        hit.classList.remove('hide');
+                    }
+                    submit.disabled = true;
+                    submit.textContent = '请输入';
+                }
+            }
+        }
+        // assemble
+        container.appendChild(prompt);
+        container.appendChild(input);
+        container.appendChild(submit);
+        container.appendChild(hit);
+        storyContainer.appendChild(container);
+        await showAfter(200, container);
+        // Button function
+        return new Promise(resolve => {
+            submit.onclick = () => {
+                input.disabled = true;
+                const value = input.value?.trim();
+                story.variablesState[variable] = (value == null || value === '') ? defaultValue : value;
+                container.classList.add('hide');
+                setTimeout(() => {
+                    container.remove();
+                    resolve();
+                }, 1000); // The default animate timout
+            }
+        })
+    }
+
+    /**
+     * Reset story container by remove all content elements
+     */
+    function resetStoryContainer() {
+        removeAll('p');
+        removeAll('span');
+        removeAll('img');
+        removeAll('.reader-input');
     }
 
 })(storyContent);
