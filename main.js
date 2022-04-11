@@ -297,7 +297,7 @@
                         } else {
                             postTasks.push(async () => {
                                 const [prompt, variable, defaultValue, pattern, type] = args;
-                                await requireReaderInput(prompt, variable, defaultValue, pattern, type);
+                                await requireReaderInput(prompt, variable, defaultValue ?? '', pattern, type ?? 'text');
                             });
                         }
                     }
@@ -685,7 +685,6 @@
      * @param type          Input type, string or number
      */
     async function requireReaderInput(promptText, variable, defaultValue, pattern, type) {
-        defaultValue = defaultValue ?? '';
         // Create validator
         let validator = null;
         if (pattern != null) {
