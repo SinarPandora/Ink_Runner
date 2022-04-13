@@ -16,6 +16,8 @@
         paragraphGroup: null
     };
     let textAnimate = [];
+    let debugMode = false;
+    const DEFAULT_DELAY = 1000.0;
 
     // TOAST Plugin config
     const TOAST_COLOR = {
@@ -46,7 +48,7 @@
             }
 
             // THEME: dark
-            if (splitTag && splitTag.property === 'theme') {
+            else if (splitTag && splitTag.property === 'theme') {
                 globalTagTheme = splitTag.val;
             }
 
@@ -63,8 +65,19 @@
             }
 
             // text_animate: css
-            if (splitTag && splitTag.property === 'text_animate') {
+            else if (splitTag && splitTag.property === 'text_animate') {
                 textAnimate = splitTag.val.split(',').map(it => it.trim());
+            }
+
+            // debug: on/off
+            else if (splitTag && splitTag.property === 'debug') {
+                debugMode = splitTag.val === 'on';
+                if (debugMode) {
+                    window.$DebugWindowScope = $DebugWindowScope;
+                } else {
+                    window.$DebugWindowScope = () => ({});
+                    document.getElementById('debug-window').remove();
+                }
             }
         }
     }
@@ -86,10 +99,16 @@
     // Main story processing function. Each time this is called it generates
     // all the next content up as far as the next set of choices.
     async function continueStory(firstTime) {
-        let delay = 0.0;
+        let delay = DEFAULT_DELAY;
 
         // Don't over-scroll past new content
         let previousBottomEdge = firstTime ? 0 : contentBottomEdgeY();
+
+        // The length of the previous paragraph
+        let previousParagraphLength = 0;
+
+        // Inline text
+        let inlineText = '';
 
         // Generate story text - loop through available content
         while (story.canContinue) {
@@ -155,7 +174,6 @@
                         storyContainer.appendChild(imageElement);
 
                         await showAfter(delay, imageElement);
-                        delay += 200.0;
                     }
 
                     // LINK: url
@@ -255,7 +273,8 @@
 
                     // DELAY: number(ms)
                     else if (splitTag.property === 'DELAY') {
-                        delay += +splitTag.val - 200;
+                        delay += +splitTag.val;
+                        postTasks.push(async () => delay = DEFAULT_DELAY);
                     }
 
                     // TOAST: [text, color, timeout, avatar] in array form
@@ -311,7 +330,7 @@
                     // AUDIOLOOP_RESUME
                     else if (tag === 'AUDIOLOOP_RESUME') {
                         if (this.audioLoop.paused) {
-                            this.audioLoop.play();
+                            setTimeout(() => this.audioLoop.play());
                         } else {
                             console.warn('Audio loop already playing.')
                         }
@@ -369,6 +388,7 @@
                         undoTagChange = false;
                     }
                     inlineElement.innerHTML = paragraphText;
+                    inlineText += paragraphText;
                     // Add any custom classes derived from ink tags
                     for (let i = 0; i < customClasses.length; i++)
                         inlineElement.classList.add(customClasses[i]);
@@ -378,8 +398,10 @@
                 if (inline.exit) {
                     storyContainer.appendChild(inline.paragraphGroup);
                     // Fade in paragraph after a short delay
-                    await showAfter(delay, inline.paragraphGroup);
-                    delay += 200.0;
+                    await showAfter(calcElementDelay(delay, previousParagraphLength), inline.paragraphGroup);
+                    await scrollDown(previousBottomEdge);
+                    previousParagraphLength = inlineText.length;
+                    inlineText = '';
                     inline.exit = false;
                     inline.isInline = false;
                     nextTag = 'p';
@@ -398,8 +420,9 @@
                     paragraphElement.classList.add(customClasses[i]);
 
                 // Fade in paragraph after a short delay
-                await showAfter(delay, paragraphElement);
-                delay += 200.0;
+                await showAfter(calcElementDelay(delay, previousParagraphLength), paragraphElement);
+                await scrollDown(previousBottomEdge);
+                previousParagraphLength = paragraphText.length;
             }
 
             for (let task of postTasks) {
@@ -407,28 +430,26 @@
             }
         } // End story loop
 
-        // Create HTML choices from ink choices
-        for (const choice of story.currentChoices) {
+        if (story.currentChoices.length > 1) {
+            // Wait default delay before show choices
+            await new Promise(resolve => setTimeout(() => {
+                resolve()
+            }, calcElementDelay(delay, previousParagraphLength)))
+        }
 
+        // Create HTML choices from ink choices
+        const choiceElements = [];
+        for (const choice of story.currentChoices) {
             // Create paragraph with anchor element
             let choiceParagraphElement = document.createElement('p');
             choiceParagraphElement.classList.add('choice');
             choiceParagraphElement.innerHTML = `<a href='#'>${choice.text}</a>`
             storyContainer.appendChild(choiceParagraphElement);
 
-            // Fade choice in after a short delay
-            await showAfter(delay, choiceParagraphElement);
-            delay += 200.0;
-
-            // Click on choice
-            let choiceAnchorEl = choiceParagraphElement.querySelectorAll('a')[0];
-            choiceAnchorEl.addEventListener('click', function (event) {
+            const onClickFunction = function (event) {
 
                 // Don't follow <a> link
                 event.preventDefault();
-
-                // Remove all existing choices
-                removeAll('.choice');
 
                 // Tell the story where to go next
                 story.ChooseChoiceIndex(choice.index);
@@ -436,18 +457,35 @@
                 // This is where the save button will save from
                 savePoint = story.state.toJson();
 
-                // Aaand loop
-                continueStory(false).then();
-            });
-        }
+                // Disable other choice
+                for (const {idx, element, onClick} of choiceElements) {
+                    element.removeEventListener('click', onClick);
+                    if (idx !== choice.index) {
+                        element.classList.add('hide');
+                    } else {
+                        element.classList.add('animate__animated', 'animate__flash', 'hide');
+                    }
+                }
 
-        // Extend height to fit
-        // We do this manually so that removing elements and creating new ones doesn't
-        // cause the height (and therefore scroll) to jump backwards temporarily.
-        storyContainer.style.height = contentBottomEdgeY() + 'px';
+                setTimeout(() => {
+                    // Remove all existing choices
+                    removeAll('.choice');
 
-        if (!firstTime) {
-            scrollDown(previousBottomEdge)
+                    // Aaand loop
+                    continueStory(false).then();
+                }, 1000); // The default animate timout
+            }
+
+            choiceElements.push({idx: choice.index, element: choiceParagraphElement, onClick: onClickFunction});
+
+            // Click on choice
+            let choiceAnchorEl = choiceParagraphElement.querySelectorAll('a')[0];
+            choiceAnchorEl.addEventListener('click', onClickFunction);
+
+            // Fade choice in after a short delay
+            await showAfter(200, choiceParagraphElement);
+            // delay += 100.0;
+            await scrollDown(previousBottomEdge);
         }
     }
 
@@ -459,9 +497,9 @@
         // set save point to here
         savePoint = story.state.toJson();
 
-        continueStory(true).then();
-
         outerScrollContainer.scrollTo(0, 0);
+
+        continueStory(true).then();
     }
 
     // -----------------------------------
@@ -486,30 +524,37 @@
 
     // Scrolls the page down, but no further than the bottom edge of what you could
     // see previously, so it doesn't go too far.
-    function scrollDown(previousBottomEdge) {
+    async function scrollDown(previousBottomEdge) {
+        return new Promise(resolve => {
+            // Extend height to fit
+            // We do this manually so that removing elements and creating new ones doesn't
+            // cause the height (and therefore scroll) to jump backwards temporarily.
+            storyContainer.style.height = contentBottomEdgeY() + 'px';
 
-        // Line up top of screen with the bottom of where the previous content ended
-        let target = previousBottomEdge;
+            // Line up top of screen with the bottom of where the previous content ended
+            let target = previousBottomEdge;
 
-        // Can't go further than the very bottom of the page
-        let limit = outerScrollContainer.scrollHeight - outerScrollContainer.clientHeight;
-        if (target > limit) target = limit;
+            // Can't go further than the very bottom of the page
+            let limit = outerScrollContainer.scrollHeight - outerScrollContainer.clientHeight;
+            if (target > limit) target = limit;
 
-        let start = outerScrollContainer.scrollTop;
+            let start = outerScrollContainer.scrollTop;
 
-        let dist = target - start;
-        let duration = 300 + 300 * dist / 100;
-        let startTime = null;
+            let dist = target - start;
+            let duration = 300 + 300 * dist / 100;
+            let startTime = null;
 
-        function step(time) {
-            if (startTime == null) startTime = time;
-            let t = (time - startTime) / duration;
-            let lerp = 3 * t * t - 2 * t * t * t; // ease in/out
-            outerScrollContainer.scrollTo(0, (1.0 - lerp) * start + lerp * target);
-            if (t < 1) requestAnimationFrame(step);
-        }
+            function step(time) {
+                if (startTime == null) startTime = time;
+                let t = (time - startTime) / duration;
+                let lerp = 3 * t * t - 2 * t * t * t; // ease in/out
+                outerScrollContainer.scrollTo(0, (1.0 - lerp) * start + lerp * target);
+                if (t < 1) requestAnimationFrame(step);
+                else resolve()
+            }
 
-        requestAnimationFrame(step);
+            requestAnimationFrame(step);
+        })
     }
 
     // The Y coordinate of the bottom end of all the story content, used
@@ -517,6 +562,14 @@
     function contentBottomEdgeY() {
         let bottomElement = storyContainer.lastElementChild;
         return bottomElement ? bottomElement.offsetTop + bottomElement.offsetHeight : 0;
+    }
+
+    // Calculate element delay by string length
+    function calcElementDelay(currentDelay, previousParagraphLength) {
+        if (currentDelay !== DEFAULT_DELAY) {
+            return currentDelay;
+        }
+        return currentDelay + Math.floor(previousParagraphLength / 15) * 1000;
     }
 
     // Remove all elements that match the given selector. Used for removing choices after
@@ -692,7 +745,7 @@
                 validator = (a) => pattern.test(a);
             } else if (type === 'number') {
                 // If pattern is "number ~ number"
-                if (/-?[0-9]+\s*~\s*-?[0-9]+/.test(pattern.trim())) {
+                if (/-?\d+\s*~\s*-?\d+/.test(pattern.trim())) {
                     const [from, to] = pattern.split('~').map(it => it.trim());
                     validator = (a) => a >= from && a <= to;
                 } else {
@@ -760,7 +813,7 @@
         container.appendChild(submit);
         container.appendChild(hit);
         storyContainer.appendChild(container);
-        await showAfter(200, container);
+        await showAfter(500, container);
         // Button function
         return new Promise(resolve => {
             submit.onclick = () => {
@@ -771,7 +824,7 @@
                 setTimeout(() => {
                     container.remove();
                     resolve();
-                }, 1000); // The default animate timout
+                }, 800); // The default animate timout
             }
         })
     }
@@ -784,6 +837,16 @@
         removeAll('span');
         removeAll('img');
         removeAll('.reader-input');
+    }
+
+    /**
+     * Debug Window
+     * @returns {{}} X-data
+     */
+    function $DebugWindowScope() {
+        return {
+
+        }
     }
 
 })(storyContent);
