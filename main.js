@@ -17,7 +17,7 @@
     };
     let textAnimate = [];
     let debugMode = false;
-    const DEFAULT_DELAY = 1000.0;
+    let DEFAULT_DELAY = 400.0;
 
     // TOAST Plugin config
     const TOAST_COLOR = {
@@ -34,6 +34,7 @@
     //  # author: Your Name
     //  # addition_themes: dark
     //  # text_animate: class list
+    //  # debug: on/off
     let globalTags = story.globalTags;
     if (globalTags) {
         for (let i = 0; i < story.globalTags.length; i++) {
@@ -71,9 +72,37 @@
 
             // debug: on/off
             else if (splitTag && splitTag.property === 'debug') {
+                console.log(`  _____ _   _ _  __  _____  ______ ____  _    _  _____    ____  _   _   _ 
+ |_   _| \\ | | |/ / |  __ \\|  ____|  _ \\| |  | |/ ____|  / __ \\| \\ | | | |
+   | | |  \\| | ' /  | |  | | |__  | |_) | |  | | |  __  | |  | |  \\| | | |
+   | | | . \` |  <   | |  | |  __| |  _ <| |  | | | |_ | | |  | | . \` | | |
+  _| |_| |\\  | . \\  | |__| | |____| |_) | |__| | |__| | | |__| | |\\  | |_|
+ |_____|_| \\_|_|\\_\\ |_____/|______|____/ \\____/ \\_____|  \\____/|_| \\_| (_)
+ 
+ Using window.story to get the ink story, be free!
+`)
                 debugMode = splitTag.val === 'on';
                 if (debugMode) {
+                    DEFAULT_DELAY = 200;
+                    window.story = story;
                     window.$DebugWindowScope = $DebugWindowScope;
+                    const debugWindowElement = document.getElementById("debug-window-prototype")
+                        .cloneNode(true);
+                    debugWindowElement.setAttribute('x-data', '$DebugWindowScope()');
+                    debugWindowElement.setAttribute('x-init', 'activeValueWatcher()');
+                    setTimeout(() => {
+                        new WinBox("😎️ GOD MODE", {
+                            id: 'debug-window',
+                            width: 600,
+                            height: 400,
+                            x: 'center',
+                            y: 'center',
+                            mount: debugWindowElement
+                        });
+                        setTimeout(() => {
+                            document.querySelector('#debug-window .wb-min').click();
+                        });
+                    })
                 } else {
                     window.$DebugWindowScope = () => ({});
                     document.getElementById('debug-window').remove();
@@ -94,15 +123,15 @@
     savePoint = story.state.toJson();
 
     // Kick off the start of the story!
-    continueStory(true).then();
+    continueStory().then();
 
     // Main story processing function. Each time this is called it generates
     // all the next content up as far as the next set of choices.
-    async function continueStory(firstTime) {
+    async function continueStory() {
         let delay = DEFAULT_DELAY;
 
         // Don't over-scroll past new content
-        let previousBottomEdge = firstTime ? 0 : contentBottomEdgeY();
+        let previousBottomEdge = contentBottomEdgeY();
 
         // The length of the previous paragraph
         let previousParagraphLength = 0;
@@ -316,7 +345,7 @@
                         } else {
                             postTasks.push(async () => {
                                 const [prompt, variable, defaultValue, pattern, type] = args;
-                                await requireReaderInput(prompt, variable, defaultValue ?? '', pattern, type ?? 'text');
+                                await requireReaderInput(previousBottomEdge, prompt, variable, defaultValue ?? '', pattern, type ?? 'text');
                             });
                         }
                     }
@@ -438,6 +467,7 @@
         }
 
         // Create HTML choices from ink choices
+        let choiceClicked = false;
         const choiceElements = [];
         for (const choice of story.currentChoices) {
             // Create paragraph with anchor element
@@ -447,6 +477,9 @@
             storyContainer.appendChild(choiceParagraphElement);
 
             const onClickFunction = function (event) {
+                // Choice lock on click
+                if (choiceClicked) return;
+                choiceClicked = true;
 
                 // Don't follow <a> link
                 event.preventDefault();
@@ -460,7 +493,7 @@
                 // Disable other choice
                 for (const {idx, element, onClick} of choiceElements) {
                     element.removeEventListener('click', onClick);
-                    if (idx !== choice.index) {
+                    if (idx !== choice.index || debugMode) {
                         element.classList.add('hide');
                     } else {
                         element.classList.add('animate__animated', 'animate__flash', 'hide');
@@ -472,7 +505,7 @@
                     removeAll('.choice');
 
                     // Aaand loop
-                    continueStory(false).then();
+                    continueStory().then();
                 }, 1000); // The default animate timout
             }
 
@@ -484,7 +517,6 @@
 
             // Fade choice in after a short delay
             await showAfter(200, choiceParagraphElement);
-            // delay += 100.0;
             await scrollDown(previousBottomEdge);
         }
     }
@@ -499,7 +531,7 @@
 
         outerScrollContainer.scrollTo(0, 0);
 
-        continueStory(true).then();
+        continueStory().then();
     }
 
     // -----------------------------------
@@ -568,6 +600,8 @@
     function calcElementDelay(currentDelay, previousParagraphLength) {
         if (currentDelay !== DEFAULT_DELAY) {
             return currentDelay;
+        } else if (debugMode) {
+            return DEFAULT_DELAY;
         }
         return currentDelay + Math.floor(previousParagraphLength / 15) * 1000;
     }
@@ -685,7 +719,7 @@
             } catch (e) {
                 console.debug("Couldn't load save state");
             }
-            continueStory(true).then();
+            continueStory().then();
         });
 
         let themeSwitchEl = document.getElementById('theme-switch');
@@ -711,7 +745,7 @@
                     background: color,
                     minWidth: '300px',
                     display: 'flex',
-                    alignItems: 'center'
+                    alignItems: 'center',
                 },
                 avatar: avatar,
                 gravity: 'bottom',
@@ -731,13 +765,14 @@
      *     <span> Hit </span>
      * </div>
      *
-     * @param promptText    Prompt information
-     * @param variable      Variable to set the value
-     * @param defaultValue  Default value
-     * @param pattern       Value pattern, for number is range or regex, for text is regex
-     * @param type          Input type, string or number
+     * @param previousBottomEdge    Previous bottom edge
+     * @param promptText            Prompt information
+     * @param variable              Variable to set the value
+     * @param defaultValue          Default value
+     * @param pattern               Value pattern, for number is range or regex, for text is regex
+     * @param type                  Input type, string or number
      */
-    async function requireReaderInput(promptText, variable, defaultValue, pattern, type) {
+    async function requireReaderInput(previousBottomEdge, promptText, variable, defaultValue, pattern, type) {
         // Create validator
         let validator = null;
         if (pattern != null) {
@@ -813,10 +848,15 @@
         container.appendChild(submit);
         container.appendChild(hit);
         storyContainer.appendChild(container);
-        await showAfter(500, container);
+        storyContainer.style.height = contentBottomEdgeY() + 'px';
+        await showAfter(DEFAULT_DELAY, container);
+        await scrollDown(previousBottomEdge);
         // Button function
         return new Promise(resolve => {
+            let isButtonClicked = false;
             submit.onclick = () => {
+                if (isButtonClicked) return;
+                isButtonClicked = true;
                 input.disabled = true;
                 const value = input.value?.trim();
                 story.variablesState[variable] = (value == null || value === '') ? defaultValue : value;
@@ -845,7 +885,41 @@
      */
     function $DebugWindowScope() {
         return {
-
+            variables: [],
+            valueWatcher: null,
+            keyword: '',
+            activeValueWatcher() {
+                this.valueWatcher = setInterval(() => {
+                    let variables = [...story.variablesState._globalVariables.entries()];
+                    const keyword = this.keyword.trim();
+                    if (this.keyword.trim().length > 0) {
+                        const keywords = keyword.split(',');
+                        variables = variables.filter(pair => keywords.find(it => pair[0].startsWith(it)) != null);
+                    }
+                    this.variables = variables.map((pair, idx) => ({
+                        id: idx,
+                        name: pair[0],
+                        value: pair[1]['value'],
+                        isSelected: false
+                    }));
+                }, 3000);
+            },
+            onVariableSelect(variable) {
+                clearInterval(this.valueWatcher);
+                variable.isSelected = true;
+                const valueChanger = document.querySelector(`#value-changer-${variable.id}`);
+                const onKeyDown = (event) => {
+                    if (variable.isSelected) {
+                        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                            variable.isSelected = false;
+                            valueChanger.removeEventListener('keydown', onKeyDown);
+                            story.variablesState[variable.name] = variable.value;
+                            this.activeValueWatcher();
+                        }
+                    }
+                };
+                valueChanger.addEventListener('keydown', onKeyDown);
+            }
         }
     }
 

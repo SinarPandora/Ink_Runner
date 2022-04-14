@@ -230,7 +230,7 @@ img {
     border-left: none;
     border-right: none;
     color: #888;
-    border-bottom: #888 solid 1px;
+    border-bottom: #888 solid 2px;
     margin-left: 30px;
     margin-right: 30px;
     font-size: 13pt;
@@ -243,6 +243,7 @@ img {
     appearance: none;
     margin: 0;
 }
+
 .reader-input > input[type="number"] {
     -moz-appearance: textfield;
 }
@@ -263,7 +264,7 @@ img {
 .reader-input > button {
     background: none;
     color: #888;
-    border: #888 solid 1px;
+    border: #888 solid 2px;
     padding: 1px 20px;
     font-size: 12pt;
     cursor: pointer;
@@ -350,4 +351,61 @@ body.dark {
 
 .dark .reader-input > input::-ms-input-placeholder { /* Microsoft Edge */
     color: #424242;
+}
+
+
+/* THEME END */
+
+/* FUNCTIONAL ELEMENT*/
+#debug-window {
+    border: gray solid 1px;
+    background: linear-gradient(to right, #000000, #007e00);
+    border-radius: 12px 12px 0 0;
+    box-shadow: none;
+}
+
+#debug-window .value-window {
+    font-size: 12pt;
+    color: white;
+    height: 100%;
+    padding: 10px;
+}
+
+#debug-window .wb-title {
+    color: white;
+    font-size: 13px;
+}
+
+#debug-window .wb-body {
+    background: black;
+}
+
+#debug-window input,
+#debug-window textarea {
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    color: #888;
+    border-bottom: #888 solid 1px;
+    font-size: 13pt;
+    padding: 3px;
+}
+
+#debug-window .search {
+    width: calc(100% - 60px);
+    margin: 0 30px 20px;
+}
+
+#debug-window .name-column {
+    width: 30%;
+}
+
+#debug-window .value-column {
+    width: 70%;
+}
+
+#debug-window .value-changer {
+    width: 90%;
+    margin-right: 30px;
 }

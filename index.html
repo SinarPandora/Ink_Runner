@@ -9,10 +9,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="lib/animate.min.css">
-    <link rel="stylesheet" href="lib/toastify.min.css">
-    <link rel="preload" href="lib/winbox.bundle.js" as="script">
-    <link rel="preload" href="lib/toastify-js.min.js" as="script">
+    <link rel="stylesheet" href="./lib/animate.min.css">
+    <link rel="stylesheet" href="./lib/toastify.min.css">
+    <link rel="preload" href="./lib/winbox.bundle.js" as="script">
+    <link rel="preload" href="./lib/toastify-js.min.js" as="script">
+    <script defer src="./lib/alpine.min.js"></script>
 
 </head>
 
@@ -35,10 +36,55 @@
         </div>
     </div>
 
-    <script src="lib/winbox.bundle.js"></script>
-    <script src="lib/toastify-js.min.js"></script>
+    <script src="./lib/winbox.bundle.js"></script>
+    <script src="./lib/toastify-js.min.js"></script>
     <script src="ink.js"></script>
     <script src="##JAVASCRIPT FILENAME##"></script>
+
+    <!-- debug window -->
+    <div id="debug-window-prototype">
+        <template x-if="variables.length > 0 || keyword.trim().length > 0">
+            <div class="value-window">
+                <p>🔍 输入变量名搜索变量，多个变量请用英文逗号隔开</p>
+                <input class="search" type="text" x-model="keyword"/>
+                <table>
+                    <thead>
+                        <tr>
+                            <td class="name-column"><span>变量名（点击编辑）</span></td>
+                            <td class="value-column"><span>变量值（Ctrl + Enter 保存）</span></td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="item of variables">
+                            <tr>
+                                <td>
+                                    <span x-text="item.name"
+                                          @click.stop="onVariableSelect(item)">
+                                    </span>
+                                </td>
+                                <td>
+                                    <span x-text="item.value"
+                                          x-show="!item.isSelected"></span>
+                                    <textarea
+                                            x-bind:id="`value-changer-${item.id}`"
+                                            class="value-changer"
+                                            x-model="item.value"
+                                            x-show="item.isSelected">
+                                    </textarea>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </template>
+        <template x-if="variables.length === 0">
+            <div class="value-window">
+                <span>Waiting for variables...</span>
+            </div>
+        </template>
+    </div>
+
     <script src="main.js"></script>
 </body>
 
