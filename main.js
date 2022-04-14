@@ -900,20 +900,23 @@
                 }, 3000);
             },
             onVariableSelect(variable) {
-                clearInterval(this.valueWatcher);
-                variable.isSelected = true;
-                const valueChanger = document.querySelector(`#value-changer-${variable.id}`);
-                const onKeyDown = (event) => {
-                    if (variable.isSelected) {
-                        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                            variable.isSelected = false;
-                            valueChanger.removeEventListener('keydown', onKeyDown);
-                            story.variablesState[variable.name] = variable.value;
-                            this.activeValueWatcher();
+                if (this.valueWatcher != null) {
+                    clearInterval(this.valueWatcher);
+                    this.valueWatcher = null;
+                    variable.isSelected = true;
+                    const valueChanger = document.querySelector(`#value-changer-${variable.id}`);
+                    const onKeyDown = (event) => {
+                        if (variable.isSelected) {
+                            if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                                variable.isSelected = false;
+                                valueChanger.removeEventListener('keydown', onKeyDown);
+                                story.variablesState[variable.name] = variable.value;
+                                this.activeValueWatcher();
+                            }
                         }
-                    }
-                };
-                valueChanger.addEventListener('keydown', onKeyDown);
+                    };
+                    valueChanger.addEventListener('keydown', onKeyDown);
+                }
             }
         }
     }
