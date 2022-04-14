@@ -130,9 +130,6 @@
     async function continueStory() {
         let delay = DEFAULT_DELAY;
 
-        // Don't over-scroll past new content
-        let previousBottomEdge = contentBottomEdgeY();
-
         // The length of the previous paragraph
         let previousParagraphLength = 0;
 
@@ -345,7 +342,7 @@
                         } else {
                             postTasks.push(async () => {
                                 const [prompt, variable, defaultValue, pattern, type] = args;
-                                await requireReaderInput(previousBottomEdge, prompt, variable, defaultValue ?? '', pattern, type ?? 'text');
+                                await requireReaderInput(prompt, variable, defaultValue ?? '', pattern, type ?? 'text');
                             });
                         }
                     }
@@ -428,7 +425,7 @@
                     storyContainer.appendChild(inline.paragraphGroup);
                     // Fade in paragraph after a short delay
                     await showAfter(calcElementDelay(delay, previousParagraphLength), inline.paragraphGroup);
-                    await scrollDown(previousBottomEdge);
+                    await scrollDown();
                     previousParagraphLength = inlineText.length;
                     inlineText = '';
                     inline.exit = false;
@@ -450,7 +447,7 @@
 
                 // Fade in paragraph after a short delay
                 await showAfter(calcElementDelay(delay, previousParagraphLength), paragraphElement);
-                await scrollDown(previousBottomEdge);
+                await scrollDown();
                 previousParagraphLength = paragraphText.length;
             }
 
@@ -517,7 +514,7 @@
 
             // Fade choice in after a short delay
             await showAfter(200, choiceParagraphElement);
-            await scrollDown(previousBottomEdge);
+            await scrollDown();
         }
     }
 
@@ -556,7 +553,7 @@
 
     // Scrolls the page down, but no further than the bottom edge of what you could
     // see previously, so it doesn't go too far.
-    async function scrollDown(previousBottomEdge) {
+    async function scrollDown() {
         return new Promise(resolve => {
             // Extend height to fit
             // We do this manually so that removing elements and creating new ones doesn't
@@ -564,7 +561,7 @@
             storyContainer.style.height = contentBottomEdgeY() + 'px';
 
             // Line up top of screen with the bottom of where the previous content ended
-            let target = previousBottomEdge;
+            let target = contentBottomEdgeY();
 
             // Can't go further than the very bottom of the page
             let limit = outerScrollContainer.scrollHeight - outerScrollContainer.clientHeight;
@@ -765,14 +762,13 @@
      *     <span> Hit </span>
      * </div>
      *
-     * @param previousBottomEdge    Previous bottom edge
-     * @param promptText            Prompt information
-     * @param variable              Variable to set the value
-     * @param defaultValue          Default value
-     * @param pattern               Value pattern, for number is range or regex, for text is regex
-     * @param type                  Input type, string or number
+     * @param promptText     Prompt information
+     * @param variable       Variable to set the value
+     * @param defaultValue   Default value
+     * @param pattern        Value pattern, for number is range or regex, for text is regex
+     * @param type           Input type, string or number
      */
-    async function requireReaderInput(previousBottomEdge, promptText, variable, defaultValue, pattern, type) {
+    async function requireReaderInput(promptText, variable, defaultValue, pattern, type) {
         // Create validator
         let validator = null;
         if (pattern != null) {
@@ -848,9 +844,8 @@
         container.appendChild(submit);
         container.appendChild(hit);
         storyContainer.appendChild(container);
-        storyContainer.style.height = contentBottomEdgeY() + 'px';
         await showAfter(DEFAULT_DELAY, container);
-        await scrollDown(previousBottomEdge);
+        await scrollDown();
         // Button function
         return new Promise(resolve => {
             let isButtonClicked = false;
